@@ -2,7 +2,7 @@ import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
-const registerUser = async (req, res, next) => {
+const registerUser = async (req, res) => {
   try {
     // 1. extract user details
     // 2. validate fields
@@ -34,20 +34,25 @@ const registerUser = async (req, res, next) => {
 
     const avatarImageLocalPath = req.files?.avatar[0]?.path;
 
+    console.log("ab", avatarImageLocalPath);
+
     let coverImageLocalPath;
     if (
       req.files &&
       Array.isArray(req.files.coverImage) &&
       req.files.coverImage.length > 0
     ) {
-      coverImageLocalPath = req.files.coverImage[0].path;
+      coverImageLocalPath = req.files?.coverImage[0]?.path;
     }
+    console.log("ced", coverImageLocalPath);
 
     if (!avatarImageLocalPath) {
+      console.log("hello");
       throw new ApiError(400, "Avatar image is required");
     }
 
     const avatar = await uploadOnCloudinary(avatarImageLocalPath);
+    console.log("avatar", avatar.url);
     const coverImage = await uploadOnCloudinary(coverImageLocalPath);
     if (!avatar) {
       throw new ApiError(400, "Avatar image is required");
@@ -55,7 +60,7 @@ const registerUser = async (req, res, next) => {
 
     const user = await User.create({
       fullName,
-      avatar: avatar?.url,
+      avatar: avatar.url,
       coverImage: coverImage?.url || "",
       email,
       password,
