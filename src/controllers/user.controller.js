@@ -2,6 +2,23 @@ import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
+
+const generateAccessAndRefreshToken = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+    return { accessToken, refreshToken };
+  } catch (error) {
+    throw new ApiError(
+      500,
+      "Something went wrong while generating access or refresh token"
+    );
+  }
+};
+
 const registerUser = async (req, res) => {
   try {
     // 1. extract user details
@@ -82,4 +99,73 @@ const registerUser = async (req, res) => {
   }
 };
 
-export { registerUser };
+const loginUser = async (req, res) => {
+  //1. req.body--->username,email,password
+  //2. find user
+  //3. comapre password
+  //4. send tokens with cookies
+  const { username, email, password } = req.body;
+  if (!(username || email)) {
+    throw new ApiError(400, "send correct username or email");
+  }
+  const findUser = await User.findOne({
+    $or: [{ username }, { email }],
+  });
+  if (!findUser) {
+    throw new ApiError(400, "User not found");
+  }
+  const isValidUser = await findUser.isPasswordCorrect(password);
+  if (!isValidUser) {
+    throw new ApiError(400, "Invalid credentials");
+  }
+  const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
+    findUser._id
+  );
+  const loggedinUser = await User.findById(user._id).select(
+    "-password -refreshToken"
+  );
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        { user: loggedinUser, accessToken, refreshToken },
+        "user loggedin successfully"
+      )
+    );
+};
+
+const logoutUser = async (req, res) => {
+  try {
+    await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $set: {
+          refreshToken: undefined,
+        },
+      },
+      { new: true }
+    );
+
+    const options = {
+      httpOnly: true,
+      secure: true,
+    };
+
+    return res
+      .status(200)
+      .clearCookie("accessToken", options)
+      .clearCookie("refreshToken", options)
+      .json(new ApiResponse(200, {}, "user logged out successfully"));
+  } catch (error) {
+    throw new ApiError(401, "Unauthorised Access");
+  }
+};
+
+export { registerUser, loginUser, logoutUser };
