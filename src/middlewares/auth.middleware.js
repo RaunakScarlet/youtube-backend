@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
-import { ApiError } from "../utils/ApiError";
+import { ApiError } from "../utils/ApiError.js";
+import { User } from "../models/user.model.js";
 export const verifyJwt = async (req, res, next) => {
   try {
     const token =
@@ -17,11 +18,16 @@ export const verifyJwt = async (req, res, next) => {
       throw new ApiError(401, "Invalid Access Token");
     }
     req.user = user;
+    console.log("====================================");
+    console.log(req.user);
+    console.log("====================================");
     next();
   } catch (error) {
-    throw new ApiError(
-      401,
-      error?.msg || "Invalid access token or Unauthorized Access"
+    res.json(
+      new ApiError(
+        401,
+        error?.msg || "Invalid access token or Unauthorized Access"
+      )
     );
   }
 };
